@@ -9,7 +9,7 @@ from scipy.special import erf
 from scipy.optimize import minimize
 from astropy.stats import sigma_clip
 
-class BANEResult(NamedTuple):
+class Result(NamedTuple):
     """Container for function results"""
     rms: float
     """RMS constrained"""
@@ -23,7 +23,7 @@ class FitGaussianCDF(NamedTuple):
     """Options for the fitting approach method"""
     linex_args: Tuple[float,float] = (0.1, 1.0)
     
-    def perform(self, data: np.ndarray) -> BANEResult:
+    def perform(self, data: np.ndarray) -> Result:
         return fit_gaussian_cdf(data=data, linex_args=self.linex_args)
 
 
@@ -64,7 +64,7 @@ def make_fitness(
         return s
     return loss_function
 
-def fit_gaussian_cdf(data: np.ndarray, linex_args: Tuple[float,float] = (0.1, 1.0)) -> BANEResult:
+def fit_gaussian_cdf(data: np.ndarray, linex_args: Tuple[float,float] = (0.1, 1.0)) -> Result:
 
     data = data[np.isfinite(data)].flatten()
 
@@ -79,7 +79,7 @@ def fit_gaussian_cdf(data: np.ndarray, linex_args: Tuple[float,float] = (0.1, 1.
         method='Nelder-Mead'
     )
 
-    bane_result = BANEResult(rms=res.x[1], bkg=res.x[0], valid_pixels=int(res.x[2] * len(data)))
+    bane_result = Result(rms=res.x[1], bkg=res.x[0], valid_pixels=int(res.x[2] * len(data)))
 
     return bane_result
 
@@ -88,7 +88,7 @@ class FittedSigmaClip(NamedTuple):
     sigma: int = 3 
     """Threshhold before clipped"""
     
-    def perform(self, data: np.ndarray) -> BANEResult:
+    def perform(self, data: np.ndarray) -> Result:
         return fitted_sigma_clip(data=data, sigma=self.sigma)
         
 def fitted_mean(data: np.ndarray, axis: Optional[int] =None) -> float:
@@ -112,7 +112,7 @@ def fitted_std(data: np.ndarray, axis: Optional[int]=None) -> float:
     
     return std
 
-def fitted_sigma_clip(data: np.ndarray, sigma: int=3) -> BANEResult:
+def fitted_sigma_clip(data: np.ndarray, sigma: int=3) -> Result:
     
     data = data[np.isfinite(data)]
     
@@ -126,7 +126,7 @@ def fitted_sigma_clip(data: np.ndarray, sigma: int=3) -> BANEResult:
     
     bkg, rms = norm.fit(clipped_plane)
 
-    result = BANEResult(rms=float(rms), bkg=float(bkg), valid_pixels=len(clipped_plane))
+    result = Result(rms=float(rms), bkg=float(bkg), valid_pixels=len(clipped_plane))
 
     return result
 
@@ -139,7 +139,7 @@ class FitBkgRmsEstimate(NamedTuple):
     outlier_thres: float = 3.0
     """Threshold that a data point should be at to be considered an outlier"""
 
-    def perform(self, data: np.ndarray) -> BANEResult:
+    def perform(self, data: np.ndarray) -> Result:
         return fit_bkg_rms_estimate(data=data, clip_rounds=self.clip_rounds, bin_perc=self.bin_perc, outlier_thres=self.outlier_thres)
 
 def mad(data, bkg=None):
@@ -154,7 +154,7 @@ def fit_bkg_rms_estimate(
     clip_rounds: int = 2,
     bin_perc: float = 0.25,
     outlier_thres: float = 3.0,
-) -> BANEResult:
+) -> Result:
    
     data = data[np.isfinite(data)]
 
@@ -188,7 +188,7 @@ def fit_bkg_rms_estimate(
     fwhm = np.abs(x1 - x2)
     noise = fwhm / 2.355
 
-    result = BANEResult(rms=float(noise), bkg=float(bkg), valid_pixels=len(data))
+    result = Result(rms=float(noise), bkg=float(bkg), valid_pixels=len(data))
 
     return result
 
@@ -201,15 +201,15 @@ class SigmaClip(NamedTuple):
     high: float = 3.0
     """High sigma clip threshhold"""
 
-    def perform(self, data: np.ndarray) -> BANEResult:
+    def perform(self, data: np.ndarray) -> Result:
         return sigmaclip(arr=data, lo=self.low, hi=self.high)
 
-def sigmaclip(arr, lo, hi, reps=10) -> BANEResult:      
+def sigmaclip(arr, lo, hi, reps=10) -> Result:      
     
     clipped = np.array(arr)[np.isfinite(arr)]
 
     if len(clipped) < 1:
-        return BANEResult(rms=np.nan, bkg=np.nan, valid_pixels=0)
+        return Result(rms=np.nan, bkg=np.nan, valid_pixels=0)
 
     std = np.std(clipped)
     mean = np.mean(clipped)
@@ -233,6 +233,6 @@ def sigmaclip(arr, lo, hi, reps=10) -> BANEResult:
             f"No stopping criteria was reached after {count} cycles"
         )
 
-    result = BANEResult(rms=float(std), bkg=float(mean), valid_pixels=len(clipped))
+    result = Result(rms=float(std), bkg=float(mean), valid_pixels=len(clipped))
 
     return result
